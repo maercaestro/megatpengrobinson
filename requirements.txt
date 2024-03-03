@@ -1,0 +1,6 @@
+requests
+numpy
+streamlit
+pandas
+beautifulsoup4
+pillow
