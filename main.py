@@ -6,10 +6,7 @@ import re
 from bs4 import BeautifulSoup
 from PIL import Image
 
-
-#define semua function kat sini dulu
-#function untuk call API
-
+# Define fetch_chemical_data function to retrieve chemical data from the website
 def fetch_chemical_data(selected_chem_value):
     # Define the URL of the website you want to scrape
     url = 'https://webbook.nist.gov/chemistry/fluid/'
@@ -36,17 +33,16 @@ def fetch_chemical_data(selected_chem_value):
             for option in options:
                 data.append((option['value'], option.text))
         else:
-            print('Select tag not found on the webpage.')
+            st.error('Select tag not found on the webpage.')
     else:
-    print('Failed to retrieve the webpage.')
+        st.error('Failed to retrieve the webpage.')
 
-# Convert the list of tuples into a DataFrame
-df = pd.DataFrame(data, columns=['Value', 'Text'])
+    # Convert the list of tuples into a DataFrame
+    df = pd.DataFrame(data, columns=['Value', 'Text'])
 
+    return df
 
-#function peng robinson
-#sebab takde accentric factor (omega), kena kira pakai critical temperature and pressure
-
+# Define calculate_acentric_factor function to calculate acentric factor using Joback method
 def calculate_acentric_factor(MW, Tb, Tc, Pc, Vc):
     """
     Calculate the acentric factor using the Joback method.
@@ -70,10 +66,7 @@ def calculate_acentric_factor(MW, Tb, Tc, Pc, Vc):
     
     return omega
 
-#baru carik peng-robinson
-# Constants
-R = 8.314  # Universal gas constant in J/(mol*K)
-
+# Define peng_robinson function to calculate molar volume using Peng-Robinson equation of state
 def peng_robinson(T, P, Tc, Pc, omega):
     """
     Calculate molar volume using Peng-Robinson equation of state.
@@ -116,31 +109,33 @@ def peng_robinson(T, P, Tc, Pc, omega):
     except ValueError as e:
         st.error(f"Error finding roots: {e}")
         return None
-      
 
-#scrap nist untuk semua list chemical
+# Constants
+R = 8.314  # Universal gas constant in J/(mol*K)
+
+# Scraping NIST for chemical data
 url = 'https://webbook.nist.gov/chemistry/fluid/'
 
-# hantar GET request
+# Send a GET request
 response = requests.get(url)
 
-# tengok request status
+# Check request status
 if response.status_code == 200:
-    # parse
+    # Parse HTML
     soup = BeautifulSoup(response.text, 'html.parser')
     
-    # carik select tag
+    # Find select tag
     select_tag = soup.find('select', id="ID")
     
-    # cek select tag
+    # Check select tag
     if select_tag:
-        # cari select options
+        # Find select options
         options = select_tag.find_all('option')
         
-        # extract text
+        # Extract text
         chem_data = [(option['value'], option.text) for option in options]
         
-        # create df
+        # Create DataFrame
         chem_df = pd.DataFrame(chem_data, columns=['Value', 'Text'])
     
     else:
@@ -148,26 +143,25 @@ if response.status_code == 200:
 else:
     st.error('Failed to retrieve the webpage.')
 
-#prepare image siap2
-image=Image.open('MEGATLogo.png')
-# Define the scale factor
+# Prepare image
+image = Image.open('MEGATLogo.png')
+# Define scale factor
 scale_factor = 0.25  
 
-# Calculate the new dimensions based on the scale factor
+# Calculate new dimensions based on scale factor
 new_width = int(image.width * scale_factor)
 new_height = int(image.height * scale_factor)
 
-# Resize the image
+# Resize image
 resized_image = image.resize((new_width, new_height))
 
-#prepare page layouT untuk streamlit
+# Prepare page layout for Streamlit
 
 # Sidebar navigation
 page = st.sidebar.radio("Navigation", ["Chemical Data", "Peng-Robinson"])
 
-# page 1, Chemical Data Page
+# Chemical Data Page
 if page == "Chemical Data":
-
     st.image(resized_image)
     st.title("MEGAT Chemical Data Retrieval")
     # Dropdown to select a chemical
@@ -175,7 +169,7 @@ if page == "Chemical Data":
 
     # Get the corresponding chemical value for the selected chemical text
     selected_chem_value = chem_df.loc[chem_df['Text'] == selected_chem_text, 'Value'].iloc[0]
-    # buang C
+    # Remove 'C'
     selected_chem_value = selected_chem_value[1:]
 
     # Button to trigger API call
@@ -185,12 +179,12 @@ if page == "Chemical Data":
             st.write("Retrieved Data:")
             st.write(df_chemical)
 
-# page 2, Peng-Robinson 
+# Peng-Robinson Page
 elif page == "Peng-Robinson":
     st.image(resized_image)
     st.title("Peng-Robinson Equation of State")
-    st.write("This page allows you to calculate the mole value using the Peng-Robinson equation of state.")
-    # Add input fields for pressure and temperature
+    st.write("This page allows you to calculate the molar volume using the Peng-Robinson equation of state.")
+    # Input fields for pressure and temperature
     pressure = st.number_input("Enter Pressure (bar)", min_value=0.0)
     temperature = st.number_input("Enter Temperature (K)", min_value=0.0)
 
@@ -199,18 +193,16 @@ elif page == "Peng-Robinson":
 
     # Get the corresponding chemical value for the selected chemical text
     selected_chem_value = chem_df.loc[chem_df['Text'] == selected_chem_text, 'Value'].iloc[0]
-    # buang C
+    # Remove 'C'
     selected_chem_value = selected_chem_value[1:]
 
-    
+    if st.button("Calculate Molar Volume"):
 
-    if st.button("Calculate Mole Value"):
-
-        # call API first
+        # Call API
         df_chemical = fetch_chemical_data(selected_chem_value)
 
         if df_chemical is not None and temperature is not None and pressure is not None:
-            # Check if the required columns are present in the DataFrame
+            # Check if required columns are present in the DataFrame
             required_columns = ['temperature_critical.value', 'temperature_boil.value', 'molecular_weight', 'pressure_critical.value', 'volume_critical.value']
             if all(col in df_chemical.columns for col in required_columns):
                 # Extract data from DataFrame
@@ -226,14 +218,8 @@ elif page == "Peng-Robinson":
                 omega = calculate_acentric_factor(MW=MW, Tb=Tb, Tc=Tc, Pc=Pc, Vc=Vc)
                 molvalue = peng_robinson(T=T, P=P, Tc=Tc, Pc=Pc, omega=omega)
 
-                st.write(f"Mole value is {molvalue}")
+                st.write(f"Molar volume is {molvalue}")
             else:
                 st.error("One or more required columns are missing in the chemical data.")
         else:
             st.error("Not enough input.")
-
-
-
-
-
-
