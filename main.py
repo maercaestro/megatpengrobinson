@@ -11,14 +11,38 @@ from PIL import Image
 #function untuk call API
 
 def fetch_chemical_data(selected_chem_value):
-    api_url = f'https://nist-api.fly.dev/crawl.json?spider_name=webbook_nist&start_requests=true&crawl_args={{"search_by":"cas", "cas":"{selected_chem_value}"}}'
-    response = requests.get(api_url)
+    # Define the URL of the website you want to scrape
+    url = 'https://webbook.nist.gov/chemistry/fluid/'
+
+    # Send a GET request to the URL
+    response = requests.get(url)
+
+    data = []  # List to store tuples of option value and text
+
+    # Check if the request was successful (status code 200)
     if response.status_code == 200:
-        json_data = response.json()
-        df_chemical = pd.json_normalize(json_data['items'])
-        return df_chemical
+        # Parse the HTML content of the page using BeautifulSoup
+        soup = BeautifulSoup(response.text, 'html.parser')
+    
+        # Find the <select> tag by its ID or class name, or any other identifying attribute
+        select_tag = soup.find('select', id="ID")
+    
+        # Check if the <select> tag was found
+        if select_tag:
+            # Find all <option> tags within the <select> tag
+            options = select_tag.find_all('option')
+        
+            # Extract and store the option value and text in the data list
+            for option in options:
+                data.append((option['value'], option.text))
+        else:
+            print('Select tag not found on the webpage.')
     else:
-        st.error("Failed to retrieve data from the API. Please try again later.")
+    print('Failed to retrieve the webpage.')
+
+# Convert the list of tuples into a DataFrame
+df = pd.DataFrame(data, columns=['Value', 'Text'])
+
 
 #function peng robinson
 #sebab takde accentric factor (omega), kena kira pakai critical temperature and pressure
